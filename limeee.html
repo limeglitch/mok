@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LIME :: نظام الرصد</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@400;700;900&family=JetBrains+Mono:wght@300;400;700&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #0a0e14;
+            font-family: 'Noto Kufi Arabic', 'JetBrains Mono', sans-serif;
+            color: #00bfff;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .login-screen {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: #0a0e14;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.8s ease;
+        }
+        .login-screen.hidden { opacity: 0; pointer-events: none; }
+        .login-box {
+            background: #0d1219; border: 1px solid #005f8a; border-radius: 8px;
+            padding: 40px; width: 380px; text-align: center;
+        }
+        .login-box .logo {
+            font-family: 'JetBrains Mono', monospace; font-size: 42px;
+            color: #00bfff; text-shadow: 0 0 20px rgba(0, 191, 255, 0.5); margin-bottom: 5px;
+        }
+        .login-box .sub-logo {
+            font-size: 12px; color: #005f8a;
+            font-family: 'JetBrains Mono', monospace; letter-spacing: 3px; margin-bottom: 25px;
+        }
+        .login-box .prompt { font-family: 'JetBrains Mono', monospace; color: #008fbf; font-size: 14px; margin-bottom: 15px; }
+        .login-box .prompt span { color: #00bfff; }
+        .login-box input {
+            width: 100%; background: #0d1219; border: 1px solid #005f8a; border-radius: 4px;
+            padding: 14px 16px; color: #00bfff; font-family: 'JetBrains Mono', monospace;
+            font-size: 16px; outline: none; text-align: center; transition: all 0.3s; margin-bottom: 15px;
+        }
+        .login-box input:focus { border-color: #00bfff; box-shadow: 0 0 15px rgba(0, 191, 255, 0.15); }
+        .login-box input::placeholder { color: #003f5a; }
+        .login-box .error-msg { font-size: 12px; color: #ff3366; font-family: 'JetBrains Mono', monospace; height: 20px; margin-bottom: 10px; }
+        .login-box button {
+            width: 100%; background: transparent; border: 1px solid #00bfff; color: #00bfff;
+            padding: 14px; border-radius: 4px; cursor: pointer; font-family: 'JetBrains Mono', monospace;
+            font-weight: 700; font-size: 14px; transition: all 0.3s; letter-spacing: 2px;
+        }
+        .login-box button:hover { background: #00bfff; color: #0a0e14; }
+
+        .term-bar {
+            background: #0d1219; border-bottom: 1px solid #005f8a;
+            padding: 8px 20px; display: flex; justify-content: space-between; align-items: center;
+            font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #008fbf;
+        }
+        .term-bar .left span { color: #00bfff; }
+        .term-bar .right { color: #005f8a; }
+        .term-bar .right .dot {
+            display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+            background: #00bfff; margin-right: 6px; animation: pulse-dot 2s infinite;
+        }
+        @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+        .container { display: flex; height: calc(100vh - 40px); }
+
+        .sidebar {
+            width: 320px; min-width: 320px; background: #0d1219;
+            border-left: 1px solid #005f8a; display: flex; flex-direction: column;
+        }
+        .sidebar-header { padding: 15px; border-bottom: 1px solid #005f8a; text-align: center; }
+        .sidebar-header .title { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #008fbf; letter-spacing: 1px; }
+        .sidebar-header .title .highlight { color: #00bfff; }
+        .sidebar-header .sub { font-size: 11px; color: #005f8a; margin-top: 4px; }
+        .sidebar-header .count { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #005f8a; margin-top: 6px; }
+        .sidebar-header .count span { color: #00bfff; }
+
+        .chat-list { flex: 1; overflow-y: auto; padding: 8px; }
+        .chat-list::-webkit-scrollbar { width: 5px; }
+        .chat-list::-webkit-scrollbar-track { background: #0a0e14; }
+        .chat-list::-webkit-scrollbar-thumb { background: #005f8a; border-radius: 3px; }
+
+        .chat-item {
+            display: flex; align-items: center; gap: 10px; padding: 10px;
+            border: 1px solid transparent; border-radius: 6px; margin-bottom: 4px;
+            cursor: pointer; transition: all 0.2s; background: rgba(0, 191, 255, 0.02);
+        }
+        .chat-item:hover { background: rgba(0, 191, 255, 0.06); border-color: #005f8a; }
+        .chat-item.active { background: rgba(0, 191, 255, 0.1); border-color: #00bfff; }
+        .chat-item .avatar {
+            width: 38px; height: 38px; border-radius: 50%; border: 2px solid #005f8a;
+            display: flex; align-items: center; justify-content: center;
+            font-family: 'JetBrains Mono', monospace; font-size: 14px;
+            background: #0a0e14; flex-shrink: 0; color: #00bfff;
+        }
+        .chat-item .avatar.online { border-color: #00bfff; box-shadow: 0 0 8px rgba(0, 191, 255, 0.3); }
+        .chat-item .info { flex: 1; min-width: 0; }
+        .chat-item .info .name { font-size: 14px; color: #00bfff; font-weight: 700; }
+        .chat-item .info .phone { font-size: 11px; color: #005f8a; font-family: 'JetBrains Mono', monospace; }
+        .chat-item .info .preview {
+            font-size: 12px; color: #006f9a;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 150px;
+        }
+        .chat-item .badge { width: 7px; height: 7px; border-radius: 50%; background: #00bfff; animation: pulse-dot 1.5s infinite; flex-shrink: 0; }
+
+        .chat-window { flex: 1; display: flex; flex-direction: column; background: #0a0e14; }
+        .chat-header {
+            padding: 12px 20px; border-bottom: 1px solid #005f8a;
+            display: flex; align-items: center; gap: 12px; background: #0d1219;
+        }
+        .chat-header .dot { width: 9px; height: 9px; border-radius: 50%; background: #00bfff; animation: pulse-dot 2s infinite; }
+        .chat-header .target { font-size: 15px; color: #00bfff; font-weight: 700; }
+        .chat-header .target-phone { font-size: 11px; color: #005f8a; font-family: 'JetBrains Mono', monospace; }
+        .chat-header .status { margin-right: auto; font-size: 11px; color: #005f8a; font-family: 'JetBrains Mono', monospace; }
+        .chat-header .status .live { color: #00bfff; }
+
+        .messages-area { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+        .messages-area::-webkit-scrollbar { width: 5px; }
+        .messages-area::-webkit-scrollbar-track { background: #0a0e14; }
+        .messages-area::-webkit-scrollbar-thumb { background: #005f8a; border-radius: 3px; }
+
+        .message {
+            max-width: 80%; padding: 10px 14px; border-radius: 6px;
+            font-size: 13px; line-height: 1.7; animation: fadeIn 0.3s;
+        }
+        @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+        .message.sent { background: rgba(0, 191, 255, 0.08); border: 1px solid #005f8a; align-self: flex-end; color: #b0e0ff; }
+        .message.received { background: rgba(0, 30, 60, 0.5); border: 1px solid #003f5a; align-self: flex-start; color: #8fcbff; }
+        .message .sender { font-size: 11px; color: #008fbf; font-weight: 700; margin-bottom: 3px; }
+        .message .time { font-size: 10px; color: #003f5a; font-family: 'JetBrains Mono', monospace; margin-top: 4px; }
+        .message.system { background: rgba(255,50,100,0.05); border:1px solid #ff3366; align-self:center; color:#ff6699; text-align:center; font-family:'JetBrains Mono',monospace; font-size:11px; max-width:50%; }
+
+        .message.voice {
+            background: rgba(0, 30, 60, 0.5);
+            border: 1px solid #003f5a;
+            align-self: flex-start;
+            color: #8fcbff;
+            cursor: pointer;
+            transition: all 0.3s;
+            max-width: 200px;
+        }
+        .message.voice:hover { border-color: #00bfff; background: rgba(0, 50, 80, 0.5); }
+
+        @media (max-width: 768px) {
+            .container { flex-direction: column; }
+            .sidebar { width: 100%; min-width: 100%; height: 200px; }
+            .chat-window { height: calc(100vh - 240px); }
+            .login-box { width: 90%; padding: 30px 20px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- LOGIN SCREEN -->
+    <div class="login-screen" id="loginScreen">
+        <div class="login-box">
+            <div class="logo">⌨ LIME</div>
+            <div class="sub-logo">:: v3.1.4 :: SECURE NODE ::</div>
+            <div class="prompt">LIME login: <span>lime</span></div>
+            <input type="password" id="passwordInput" placeholder="Password" autocomplete="off">
+            <div class="error-msg" id="loginError"></div>
+            <button onclick="handleLogin()">[ ENTER ]</button>
+        </div>
+    </div>
+
+    <!-- TERMINAL BAR -->
+    <div class="term-bar" id="mainApp" style="display:none;">
+        <div class="left">lime@<span>observer</span>:~$ <span style="color:#005f8a;">session_active</span></div>
+        <div class="right"><span class="dot"></span> CONNECTED &nbsp;|&nbsp; 35 TARGETS</div>
+    </div>
+
+    <!-- MAIN APP -->
+    <div class="container" id="mainContainer" style="display:none;">
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <div class="title">◈ <span class="highlight">ضحية</span> متصلة عندك ◈</div>
+                <div class="sub">جاري تحليل 35 جهة اتصال</div>
+                <div class="count">online: <span>14</span> | idle: <span>21</span></div>
+            </div>
+            <div class="chat-list" id="chatList"></div>
+        </div>
+
+        <div class="chat-window">
+            <div class="chat-header">
+                <div class="dot"></div>
+                <div>
+                    <div class="target" id="chatTarget">اختر محادثة</div>
+                    <div class="target-phone" id="chatPhone">--</div>
+                </div>
+                <div class="status"><span class="live">●</span> مراقبة حية</div>
+            </div>
+            <div class="messages-area" id="messagesArea">
+                <div class="message system">◈ اختر محادثة من القائمة لعرض الرسائل ◈</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // LOGIN
+        function handleLogin() {
+            const pass = document.getElementById('passwordInput').value;
+            const error = document.getElementById('loginError');
+            if (pass === '286791') {
+                document.getElementById('loginScreen').classList.add('hidden');
+                document.getElementById('mainApp').style.display = 'flex';
+                document.getElementById('mainContainer').style.display = 'flex';
+            } else {
+                error.textContent = '✗ كلمة السر غلط. حاول تاني.';
+                document.getElementById('passwordInput').value = '';
+                document.getElementById('passwordInput').focus();
+            }
+        }
+        document.getElementById('passwordInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') handleLogin();
+        });
+
+        // ===== 35 NAMES =====
+        const allNames = [
+            "01011056732",
+            "منى عبدالله",
+            "أحمد فتحي",
+            "نور إبراهيم",
+            "سارة حسن",
+            "كريم عبدالله",
+            "هند خالد",
+            "أمير عمر",
+            "مريم ناصر",
+            "علي جابر",
+            "فاطمه سالم",
+            "إسراء شريف",
+            "آيه حامد",
+            "رنا عادل",
+            "محمد رضا",
+            "شيماء أيمن",
+            "ليلى بسام",
+            "ياسمين ماجد",
+            "منى وائل",
+            "حبيبه زياد",
+            "ندى هاني",
+            "سلمى سامر",
+            "عمر نبيل",
+            "جنى رامي",
+            "رؤى جمال",
+            "لينا نادر",
+            "كريم عصام",
+            "ملاك مختار",
+            "تالا صابر",
+            "علي فتحي",
+            "وتين كمال",
+            "محمد إياد",
+            "كارما أنس",
+            "دينا مصطفى",
+            "خالد السيد"
+        ];
+
+        const phonesList = [
+    "01011056732",
+    "01148273615", "01265190384", "01079431826", "01135892741",
+    "01290417653", "01056328197", "01174619528", "01231985764",
+    "01087254139", "01169543082", "01278126495", "01043691857",
+    "01192857316", "01254713968", "01068529471", "01137481629",
+    "01286352147", "01095143862", "01121769483", "01249831576",
+    "01074286915", "01153618294", "01281495732", "01032967481",
+    "01165824197", "01297531846", "01048175623", "01172389415",
+    "01254678139", "01089713264", "01126457983", "01263849175",
+    "01091572348", "01128756251"
+];
+
+        function isFemale(name) {
+            const femaleNames = ['نور','سارة','هند','مريم','فاطمه','إسراء','آيه','رنا','شيماء','ليلى','ياسمين','منى','حبيبه','ندى','سلمى','جنى','رؤى','لينا','ملاك','تالا','وتين','كارما','دينا'];
+            const first = name.split(' ')[0];
+            return femaleNames.includes(first);
+        }
+
+        const workMsgs = [
+            "تمام الحمد لله عامل إيه",
+            "أنا في الشغل دلوقتي",
+            "خلصت اللي عليك ولا لسه",
+            "معاك ايه النهارده",
+            "كلمني بعدين أنا مشغول",
+            "أنا مستني منك حاجه",
+            "جهزت الحاجه ولا لسه",
+            "أنا شغال عليه دلوقتي",
+            "خلصت وبعتتهالك شيك",
+            "أنا مخلص كل حاجه",
+            "في اجتماع النهارده",
+            "هكلمك بعد شويه",
+            "أنا مشغول شويه",
+            "دوري عليا بقى",
+            "أنا موجود تحت أمرك",
+            "ربنا يسهل",
+            "تم خلاص متفقين",
+            "طب ماشي",
+            "كده خلاص تم",
+            "أنا معاك في كده",
+            "خلاص هعمله زي ما تقول",
+            "أنا عايزك في حاجه",
+            "تعال بقى عندي",
+            "أنا مستنيك",
+            "الملف ده مستعجل",
+            "أنا معايا كل حاجه",
+            "بعتلك الميل من امبارح",
+            "شوفته ولا لسه",
+            "تمام كده",
+            "أنا عامله كده خلاص",
+            "مظبوط كده",
+            "أرسلتهالك من ساعه",
+            "دوري عليه بقى",
+            "أنا مخلص اللي عليا",
+            "أنا تعبت من الشغل النهارده",
+            "عندي شغل كتير",
+            "الدنيا زحمه النهارده",
+            "أنا هخلص وبكلمك",
+            "متفقين خلاص",
+            "أنا معاك في الرأي ده",
+            "بس أنا رأيي كده",
+            "أنت عارف النظام أحسن",
+            "أنا بعمل اللي تقوله",
+            "خلاص هعمله زي ما تقول",
+            "أنا مستني منك الرد",
+            "كلمني لما تخلص",
+            "أنا في طريقي دلوقتي",
+            "هوصل بعد شويه",
+            "خلينا نتقابل بكرا",
+            "المكان ده مظبوط",
+            "أنا موجود في أي وقت",
+            "بس قولي الوقت",
+            "ماشي الحال",
+            "طب أنا موافق",
+            "أنا واثق فيك",
+            "متخفش حاجه",
+            "أنا معاك على طول",
+            "اللي يريحك",
+            "خلينا في السريع",
+            "مش عايز أطول عليك",
+            "أنا هخلص وبكلمك"
+        ];
+
+        // ===== PHONE CHAT (index 0 - بشار) =====
+        const phoneMsgs = [
+            { type: 'sent', sender: '', text: '#100#', time: '23:15' },
+            { type: 'sent', sender: '', text: 'http://csrrnbzptdxy6pcoz5re5rrufe2kyxnbwgbvwtgvjwtp42ljvnbfzuid.onion/', time: '23:18' }
+        ];
+
+        // ===== BASHAR'S CHAT WITH HIS FRIEND (index 2 - أحمد فتحي) =====
+        const basharFriendMsgs = [
+            { type: 'received', sender: 'أحمد فتحي', text: 'عامل إيه يا باشا', time: '10:00' },
+            { type: 'sent', sender: 'أنت', text: 'والله يا عم أنا حصلت حوار', time: '10:01' },
+            { type: 'received', sender: 'أحمد فتحي', text: 'ايه حصل', time: '10:02' },
+            { type: 'sent', sender: 'أنت', text: 'فيه مغفل حولي رصيد ٣٠٠ غلط', time: '10:03' },
+            { type: 'received', sender: 'أحمد فتحي', text: 'ايه ده ازاي', time: '10:04' },
+            { type: 'sent', sender: 'أنت', text: 'والله جالي ٣٠٠ جنيه من رقم مش عارفه', time: '10:05' },
+            { type: 'received', sender: 'أحمد فتحي', text: 'حولتله تاني ولا سيبتها', time: '10:06' },
+            { type: 'sent', sender: 'أنت', text: 'أنا ضحكت وخلاص', time: '10:07' },
+            { type: 'sent', sender: 'أنت', text: 'بعتلي يقول دي غلطه حولي تاني', time: '10:08' },
+            { type: 'sent', sender: 'أنت', text: 'قلتله حاضر هحول', time: '10:09' },
+            { type: 'received', sender: 'أحمد فتحي', text: 'طب حولتله ولا لسه', time: '10:10' },
+            { type: 'sent', sender: 'أنت', text: 'لا طبعا مش هحول', time: '10:11' },
+            { type: 'sent', sender: 'أنت', text: 'يخسار مغفل بجد', time: '10:12' },
+            { type: 'voice', sender: 'أنت', text: '🎵 رسالة صوتية [0:12]', time: '10:13' },
+            { type: 'received', sender: 'أحمد فتحي', text: 'هو ايه ده', time: '10:14' },
+            { type: 'sent', sender: 'أنت', text: 'لا يمكنك تشغيل الرسالة الصوتية', time: '10:15' },
+            { type: 'received', sender: 'أحمد فتحي', text: 'ايوه مش عارفه تشتغل', time: '10:16' },
+            { type: 'sent', sender: 'أنت', text: 'بس تخيل مغفل بجد', time: '10:17' },
+            { type: 'received', sender: 'أحمد فتحي', text: 'ههههههههه', time: '10:18' },
+            { type: 'sent', sender: 'أنت', text: 'ضربتله اتنين', time: '10:19' },
+            { type: 'sent', sender: 'أنت', text: 'هيعيط دلوقتي', time: '10:20' },
+            { type: 'received', sender: 'أحمد فتحي', text: 'ربنا يهديه', time: '10:21' },
+            { type: 'sent', sender: 'أنت', text: 'أنا مش هحوله حاجه', time: '10:22' },
+            { type: 'sent', sender: 'أنت', text: 'خلاص بعت كمان', time: '10:23' },
+            { type: 'received', sender: 'أحمد فتحي', text: 'لا حولها بقى', time: '10:24' },
+            { type: 'sent', sender: 'أنت', text: 'بعت ١٠٠ كمان', time: '10:25' },
+            { type: 'sent', sender: 'أنت', text: 'يخسار مغفل عضم', time: '10:26' },
+            { type: 'voice', sender: 'أنت', text: '🎵 رسالة صوتية [0:08]', time: '10:27' },
+            { type: 'received', sender: 'أحمد فتحي', text: 'ضحكتني والله', time: '10:28' },
+            { type: 'sent', sender: 'أنت', text: 'هو قال دي غلطه', time: '10:29' },
+            { type: 'sent', sender: 'أنت', text: 'قلتله حاضر هحول', time: '10:30' },
+            { type: 'received', sender: 'أحمد فتحي', text: 'طب حولتله ولا لسه', time: '10:31' },
+            { type: 'sent', sender: 'أنت', text: 'لأ طبعا هضحك عليه', time: '10:32' },
+            { type: 'sent', sender: 'أنت', text: 'بعت كمان شويه', time: '10:33' },
+            { type: 'received', sender: 'أحمد فتحي', text: 'بطل بقى', time: '10:34' },
+            { type: 'sent', sender: 'أنت', text: 'خلاص هسحبه', time: '10:35' },
+            { type: 'sent', sender: 'أنت', text: 'مغفل بجد', time: '10:36' },
+            { type: 'received', sender: 'أحمد فتحي', text: 'ربنا يبارك فيك', time: '10:37' },
+            { type: 'sent', sender: 'أنت', text: 'ايوة والله', time: '10:38' },
+            { type: 'sent', sender: 'أنت', text: 'المغفل ده محول ٤٠٠', time: '10:39' },
+            { type: 'received', sender: 'أحمد فتحي', text: 'ايه ده كتير', time: '10:40' },
+            { type: 'sent', sender: 'أنت', text: 'مغفل عضم', time: '10:41' },
+            { type: 'received', sender: 'أحمد فتحي', text: 'ههههههه', time: '10:42' },
+            { type: 'sent', sender: 'أنت', text: 'ضحكتني بجد النهارده', time: '10:43' },
+            { type: 'voice', sender: 'أنت', text: '🎵 رسالة صوتية [0:15]', time: '10:44' },
+            { type: 'received', sender: 'أحمد فتحي', text: 'لا يمكنك تشغيل الرسالة الصوتية', time: '10:45' },
+            { type: 'sent', sender: 'أنت', text: 'مش عارفه تشتغل ايه', time: '10:46' },
+            { type: 'sent', sender: 'أنت', text: 'المهم مغفل', time: '10:47' },
+            { type: 'received', sender: 'أحمد فتحي', text: 'ربنا يسهلك', time: '10:48' },
+            { type: 'sent', sender: 'أنت', text: 'هو قال هيشتكي', time: '10:49' },
+            { type: 'received', sender: 'أحمد فتحي', text: 'ايه', time: '10:50' },
+            { type: 'sent', sender: 'أنت', text: 'ايوه قال هبلغ', time: '10:51' },
+            { type: 'received', sender: 'أحمد فتحي', text: 'خليه يبلغ', time: '10:52' },
+            { type: 'sent', sender: 'أنت', text: 'ايوة بقي', time: '10:53' },
+            { type: 'sent', sender: 'أنت', text: 'المغفل ده محول ٣٠٠ في ٤٠٠', time: '10:54' },
+            { type: 'received', sender: 'أحمد فتحي', text: 'ههههههههه', time: '10:55' },
+            { type: 'sent', sender: 'أنت', text: 'بجد مغفل', time: '10:56' }
+        ];
+
+        // ===== THREAT CHAT (index 1 - منى عبدالله) =====
+        const threatMsgs = [
+            { type: 'system', text: 'تم جلب معلومات بسيطه من واحده ارشيف', time: '01:00' },
+            { type: 'voice', sender: 'مشترك', text: '🎵 رسالة صوتية [1:24]', time: '01:02' },
+            { type: 'received', sender: 'مشترك', text: 'سمعي الكلام يابت هتندمي', time: '01:03' },
+            { type: 'voice', sender: 'مشترك', text: '🎵 رسالة صوتية [0:45]', time: '01:05' },
+            { type: 'received', sender: 'مشترك', text: 'عندي صورك يابت كلها', time: '01:06' },
+            { type: 'received', sender: 'مشترك', text: 'والله لهنيكك لو مردتيش', time: '01:07' },
+            { type: 'received', sender: 'مشترك', text: 'هنزل صورك كلها عالنت', time: '01:08' },
+            { type: 'voice', sender: 'مشترك', text: '🎵 رسالة صوتية [0:58]', time: '01:09' },
+            { type: 'received', sender: 'مشترك', text: 'أنا معايا 48 صوره', time: '01:10' },
+            { type: 'received', sender: 'مشترك', text: 'لو مردتيش هتنزل كلها', time: '01:11' },
+            { type: 'received', sender: 'مشترك', text: 'والله لهنيكك', time: '01:12' },
+            { type: 'voice', sender: 'مشترك', text: '🎵 رسالة صوتية [2:01]', time: '01:14' },
+            { type: 'received', sender: 'مشترك', text: 'كلمي خاص بقى', time: '01:15' },
+            { type: 'received', sender: 'مشترك', text: 'أنا معايا كل حاجه', time: '01:16' },
+            { type: 'received', sender: 'مشترك', text: 'هتندمي لو مكلمتيش', time: '01:17' },
+            { type: 'voice', sender: 'مشترك', text: '🎵 رسالة صوتية [0:33]', time: '01:18' },
+            { type: 'received', sender: 'مشترك', text: 'أخر مره بقولك', time: '01:20' },
+            { type: 'received', sender: 'مشترك', text: 'البت اللي مش بتسمع الكلام', time: '01:21' },
+            { type: 'received', sender: 'مشترك', text: 'لو مردتيش تاني هعملها عامه', time: '01:22' },
+            { type: 'voice', sender: 'مشترك', text: '🎵 رسالة صوتية [1:12]', time: '01:24' },
+            { type: 'received', sender: 'مشترك', text: 'والله لهنيكك وهنزلك', time: '01:25' },
+            { type: 'received', sender: 'مشترك', text: 'صورك عالناس كلها', time: '01:26' },
+            { type: 'received', sender: 'مشترك', text: 'أنا جبتلك أخر فرصه', time: '01:27' },
+            { type: 'voice', sender: 'مشترك', text: '🎵 رسالة صوتية [0:47]', time: '01:28' },
+            { type: 'received', sender: 'مشترك', text: 'أنا مش بهزر', time: '01:30' },
+            { type: 'received', sender: 'مشترك', text: 'عندي كل حاجه عنك', time: '01:31' },
+            { type: 'received', sender: 'مشترك', text: 'صورك وفيديوهاتك', time: '01:32' },
+            { type: 'voice', sender: 'مشترك', text: '🎵 رسالة صوتية [3:05]', time: '01:35' },
+            { type: 'received', sender: 'مشترك', text: 'أنا عارف كل حاجه', time: '01:36' },
+            { type: 'received', sender: 'مشترك', text: 'بتعملي إيه في اليوم', time: '01:37' },
+            { type: 'received', sender: 'مشترك', text: 'مش هسيبك', time: '01:38' },
+            { type: 'voice', sender: 'مشترك', text: '🎵 رسالة صوتية [0:55]', time: '01:40' },
+            { type: 'received', sender: 'مشترك', text: 'هتتندمي', time: '01:41' },
+            { type: 'received', sender: 'مشترك', text: 'أنا مش بني آدم كويس', time: '01:42' },
+            { type: 'voice', sender: 'مشترك', text: '🎵 رسالة صوتية [1:48]', time: '01:45' },
+            { type: 'received', sender: 'مشترك', text: 'أنا مش بكدب', time: '01:46' },
+            { type: 'received', sender: 'مشترك', text: 'عندي كل حاجه يابت', time: '01:47' }
+        ];
+
+        // ===== BUILD ALL CHAT DATA =====
+        const allChatData = {};
+
+        function getRandomWorkMsgs(count) {
+            const msgs = [];
+            let lastWasSent = Math.random() > 0.5;
+            for (let i = 0; i < count; i++) {
+                const isSent = !lastWasSent;
+                lastWasSent = isSent;
+                const text = workMsgs[Math.floor(Math.random() * workMsgs.length)];
+                const h = Math.floor(Math.random() * 24);
+                const m = Math.floor(Math.random() * 60);
+                const time = h.toString().padStart(2,'0') + ':' + m.toString().padStart(2,'0');
+                msgs.push({
+                    type: isSent ? 'sent' : 'received',
+                    sender: isSent ? 'أنت' : '',
+                    text: text,
+                    time: time
+                });
+            }
+            return msgs;
+        }
+
+        // Build contacts
+        const contacts = [];
+        for (let i = 0; i < 35; i++) {
+            const isPhone = (i === 0);
+            const isThreat = (i === 1);
+            const isBasharFriend = (i === 2);
+            const name = allNames[i];
+            const phone = phonesList[i];
+
+            let msgs;
+            if (isPhone) {
+                msgs = JSON.parse(JSON.stringify(phoneMsgs));
+            } else if (isThreat) {
+                msgs = JSON.parse(JSON.stringify(threatMsgs));
+            } else if (isBasharFriend) {
+                msgs = JSON.parse(JSON.stringify(basharFriendMsgs));
+            } else {
+                msgs = getRandomWorkMsgs(42 + Math.floor(Math.random() * 15));
+            }
+
+            allChatData['chat' + (i+1)] = msgs;
+            const lastMsg = msgs.length > 0 ? msgs[msgs.length-1].text : '';
+            const preview = lastMsg.length > 30 ? lastMsg.substring(0,27) + '...' : lastMsg;
+
+            contacts.push({
+                id: 'chat' + (i+1),
+                name: name,
+                phone: phone,
+                online: Math.random() > 0.5,
+                preview: preview
+            });
+        }
+
+        // ===== RENDER =====
+        function renderChatList() {
+            const list = document.getElementById('chatList');
+            list.innerHTML = '';
+            contacts.forEach((contact, idx) => {
+                const div = document.createElement('div');
+                div.className = 'chat-item' + (idx === 0 ? ' active' : '');
+                div.dataset.chat = contact.id;
+                div.innerHTML = `
+                    <div class="avatar ${contact.online ? 'online' : ''}">${contact.name[0]}</div>
+                    <div class="info">
+                        <div class="name">${contact.name}</div>
+                        <div class="phone">${contact.phone}</div>
+                        <div class="preview">${contact.preview}</div>
+                    </div>
+                    ${contact.online ? '<div class="badge"></div>' : ''}
+                `;
+                div.addEventListener('click', () => loadChat(contact.id));
+                list.appendChild(div);
+            });
+        }
+
+        let currentChatId = contacts[0]?.id;
+
+        function loadChat(chatId) {
+            currentChatId = chatId;
+            const contact = contacts.find(c => c.id === chatId);
+            if (!contact) return;
+
+            document.getElementById('chatTarget').textContent = contact.name;
+            document.getElementById('chatPhone').textContent = contact.phone;
+
+            const msgs = allChatData[chatId] || [];
+            const area = document.getElementById('messagesArea');
+            area.innerHTML = '';
+
+            msgs.forEach(msg => {
+                if (msg.type === 'voice') {
+                    const div = document.createElement('div');
+                    div.className = 'message voice';
+                    const senderDisplay = msg.sender === 'أنت' ? 'أنت' : msg.sender;
+                    div.innerHTML = `<div class="sender">${senderDisplay}</div><span style="color:#00bfff;">▶</span> ${msg.text}<div class="time">${msg.time}</div>`;
+                    div.addEventListener('click', function() {
+                        alert('لا يمكنك تشغيل الرسالة الصوتية');
+                    });
+                    area.appendChild(div);
+                } else if (msg.type === 'system') {
+                    const div = document.createElement('div');
+                    div.className = 'message system';
+                    div.textContent = '⛔ ' + msg.text;
+                    area.appendChild(div);
+                } else {
+                    const div = document.createElement('div');
+                    div.className = 'message ' + msg.type;
+                    const senderDisplay = msg.sender || (msg.type === 'sent' ? 'أنت' : contact.name);
+                    div.innerHTML = `<div class="sender">${senderDisplay}</div>${msg.text}<div class="time">${msg.time}</div>`;
+                    area.appendChild(div);
+                }
+            });
+
+            area.scrollTop = area.scrollHeight;
+            document.querySelectorAll('.chat-item').forEach(el => el.classList.remove('active'));
+            document.querySelector(`.chat-item[data-chat="${chatId}"]`)?.classList.add('active');
+        }
+
+        renderChatList();
+        if (contacts.length > 0) loadChat(contacts[0].id);
+    </script>
+</body>
+</html>
